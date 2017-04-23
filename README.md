@@ -1,2 +1,2 @@
-# akka-tracing-couchdb-collector
+# Akka Tracing CouchDB Collector
 A collector and data source (for visualization) for CouchDB database for Akka Tracing Library.
