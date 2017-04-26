@@ -11,7 +11,7 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
 
   import ConfigUtils._
 
-  private val dbConfig = config.getOrElse[Config]("database", ConfigFactory.empty("db"))
+  private val dbConfig = config.getOrElse[Config]("database", ConfigFactory.empty("database"))
   private val logger = LoggerFactory.getLogger(getClass)
 
   private[akka_tracing] val couchDbClient = CouchDbClient(dbConfig)
