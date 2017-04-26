@@ -25,6 +25,8 @@ class CouchDbClient(host: String,
   def getDb(name: String): CouchDatabase =
     new CouchDatabase(s"$protocol://$host:$port", name, asyncHttpClient, user, password)
 
+  def close(): Unit = asyncHttpClient.close()
+
 }
 
 object CouchDbClient {

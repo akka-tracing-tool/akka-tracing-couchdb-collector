@@ -22,5 +22,6 @@ object PluginOperations extends App {
         Await.result(databaseUtils.clean, Duration.Inf)
       case _ =>
     }
+    databaseUtils.couchDbClient.close()
   }
 }

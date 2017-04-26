@@ -77,7 +77,7 @@ class CouchDatabase private[couchdb](baseUrl: String,
   }
 
   def attemptToCreate: Future[Unit] = {
-    val request = buildRequest(baseUrl, "PUT", user, password)
+    val request = buildRequest(databaseUrl, "PUT", user, password)
     client.executeRequest(request).toCompletableFuture.asScala.map(_ => ())
       .recover({ case _ => () })
   }
@@ -95,7 +95,9 @@ class CouchDatabase private[couchdb](baseUrl: String,
             body = Some(compact(render(JObject(
               "docs" -> JArray(
                 docs map { doc =>
-                  doc merge JObject(
+                  JObject(
+                    "_id" -> doc \ "id",
+                    "_rev" -> doc \ "value" \ "rev",
                     "_deleted" -> JBool(true)
                   )
                 }
