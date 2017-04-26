@@ -11,13 +11,13 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
 
   import ConfigUtils._
 
-  private val dbConfig = config.getOrElse[Config]("db", ConfigFactory.empty("db"))
+  private val dbConfig = config.getOrElse[Config]("database", ConfigFactory.empty("db"))
   private val logger = LoggerFactory.getLogger(getClass)
 
   private[akka_tracing] val couchDbClient = CouchDbClient(dbConfig)
 
-  private[akka_tracing] val receiverMessagesDatabase = couchDbClient.getDb("sender_messages")
-  private[akka_tracing] val senderMessagesDatabase = couchDbClient.getDb("receiver_messages")
+  private[akka_tracing] val receiverMessagesDatabase = couchDbClient.getDb("receiver_messages")
+  private[akka_tracing] val senderMessagesDatabase = couchDbClient.getDb("sender_messages")
   private[akka_tracing] val messagesRelationsDatabase = couchDbClient.getDb("messages_relations")
 
   def init: Future[Unit] = {
