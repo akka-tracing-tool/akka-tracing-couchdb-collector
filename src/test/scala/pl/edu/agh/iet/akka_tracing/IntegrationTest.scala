@@ -24,11 +24,7 @@ import scala.concurrent.duration.Duration
   *
   * Both instances should have user test with password test.
   *
-  * You can achieve this by running:
-  * $ docker run -d --name couchdb -p 5984:5984 klaemo/couchdb:1.6.1
-  * $ docker run -d --name couchdb2 -p 5985:5984 klaemo/couchdb:1.6.1
-  * $ curl -XPUT http://localhost:5984/_config/admidns/test -H "Content-type: application/json" --data '"test"'
-  * $ curl -XPUT http://localhost:5985/_config/admidns/test -H "Content-type: application/json" --data '"test"'
+  * You can achieve this by running travis_before.sh script.
   */
 class IntegrationTest extends FlatSpec with Matchers with ScalaFutures {
   private val masterConfig = ConfigFactory.load("master.conf")
