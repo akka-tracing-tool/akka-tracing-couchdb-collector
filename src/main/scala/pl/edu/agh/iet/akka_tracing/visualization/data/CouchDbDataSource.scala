@@ -22,7 +22,8 @@ class CouchDbDataSource(config: Config)(implicit val ec: ExecutionContext) exten
       val ids = senderMessages map { msg => msg._id }
       receiverMessagesDatabase.getDocs[CouchDbReceiverMessage](ids) map { receiverMessages =>
         senderMessages map { senderMessage =>
-          val receiverMessage = receiverMessages.find(_._id == senderMessage._id)
+          val receiverMessage = receiverMessages
+            .find(_._id == senderMessage._id)
           Message(
             UUID.fromString(senderMessage._id),
             senderMessage.sender,

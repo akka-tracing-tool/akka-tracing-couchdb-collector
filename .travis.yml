@@ -1,7 +1,18 @@
 language: scala
+sudo: required
+services:
+- docker
 scala:
-- 2.11.8
+- 2.11.11
+before_script:
+- ./travis-before.sh
 script:
 - sbt clean test
+after_script:
+- echo "Stoping and removing containers..."
+- docker stop couchdb
+- docker stop couchdb2
+- docker rm couchdb
+- docker rm couchdb2
 jdk:
 - oraclejdk8

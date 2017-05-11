@@ -18,7 +18,7 @@ class CouchDatabase private[couchdb](baseUrl: String,
                                      password: Option[String])
                                     (implicit ec: ExecutionContext) {
 
-  import HttpClientUtils._
+  import CouchDbUtils._
 
   private val databaseUrl = s"$baseUrl/$name"
   private implicit val formats = DefaultFormats
@@ -34,9 +34,8 @@ class CouchDatabase private[couchdb](baseUrl: String,
       Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
-          Future.successful(
-            (json \ "rows").asInstanceOf[JArray].arr.map(doc => extract[T](doc))
-          )
+          val JArray(rows) = json \ "rows"
+          Future.successful(rows.map(row => extract[T](row \ "doc")))
       }
     }
   }
@@ -47,19 +46,20 @@ class CouchDatabase private[couchdb](baseUrl: String,
       queryParams = Some(List(
         "include_docs" -> "true"
       )),
-      body = Some(compact(render(JObject(
+      body = Some(JObject(
         "keys" -> JArray(
           ids.map(id => JString(id))
         )
-      ))))
+      ))
     )
     client.executeRequest(request).toCompletableFuture.asScala flatMap { response =>
       Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
-          Future.successful(
-            (json \ "rows").asInstanceOf[JArray].arr.map(doc => extract[T](doc))
-          )
+          val JArray(rows) = json \ "rows"
+          Future.successful(rows
+            .filter(row => (row \ "doc").isDefined)
+            .map(row => extract[T](row \ "doc")))
       }
     }
   }
@@ -67,11 +67,11 @@ class CouchDatabase private[couchdb](baseUrl: String,
   def putDocs[T <: Document](docs: List[T]): Future[Unit] = {
     val url = s"$databaseUrl/_bulk_docs"
     val request = buildRequest(url, "POST", user, password,
-      body = Some(compact(render(JObject(
+      body = Some(JObject(
         "docs" -> JArray(
           docs.map(doc => decompose(doc))
         )
-      ))))
+      ))
     )
     client.executeRequest(request).toCompletableFuture.asScala.map(_ => ())
   }
@@ -89,23 +89,31 @@ class CouchDatabase private[couchdb](baseUrl: String,
       Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
-          val docs = (json \ "rows").asInstanceOf[JArray].arr
-          val deleteUrl = s"$databaseUrl/_bulk_docs"
-          val deleteRequest = buildRequest(deleteUrl, "POST", user, password,
-            body = Some(compact(render(JObject(
-              "docs" -> JArray(
-                docs map { doc =>
-                  JObject(
-                    "_id" -> doc \ "id",
-                    "_rev" -> doc \ "value" \ "rev",
-                    "_deleted" -> JBool(true)
+          json \ "rows" match {
+            case JArray(docs) =>
+              val deleteUrl = s"$databaseUrl/_bulk_docs"
+              val deleteRequest = buildRequest(deleteUrl, "POST", user, password,
+                body = Some(JObject(
+                  "docs" -> JArray(
+                    docs map { doc =>
+                      JObject(
+                        "_id" -> doc \ "id",
+                        "_rev" -> doc \ "value" \ "rev",
+                        "_deleted" -> JBool(true)
+                      )
+                    }
                   )
-                }
+                ))
               )
-            ))))
-          )
-          client.executeRequest(deleteRequest).toCompletableFuture.asScala.map { _ => () }
+              client.executeRequest(deleteRequest).toCompletableFuture.asScala.map { _ => () }
+            case _ => Future.successful(())
+          }
       }
     }
+  }
+
+  def compactDb(): Future[Unit] = {
+    val request = buildRequest(s"$databaseUrl/_compact", "POST", user, password)
+    client.executeRequest(request).toCompletableFuture.asScala map { _ => () }
   }
 }
