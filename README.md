@@ -30,10 +30,10 @@ This can be put under `replication` key in the config above:
     {
       host = "localhost" // Host to replicate database to
       port = 5984 // Port that the target CouchDB is listening on
-      user = test //
-      password = test //
-      useHttps = true
-      createDb = true // If the replication should create target databases
+      user = test // User on the target CouchDB to use for authentication
+      password = test // Password on the target CouchDB to use for authentication
+      useHttps = true // If the client should use HTTPS protocol (recommended)
+      createDb = true // If the replication should create target databases (requires admin privileges on target CouchDB)
     }
   ]
 }

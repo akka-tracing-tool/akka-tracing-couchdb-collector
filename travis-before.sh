@@ -9,8 +9,8 @@ for ((i=1;i<=10;i++)); do
 done
 printf "\n"
 echo "Creating admins (users: test/test)"
-curl -XPUT http://localhost:5984/_config/admidns/test -H "Content-type: application/json" --data '"test"'
-curl -XPUT http://localhost:5985/_config/admidns/test -H "Content-type: application/json" --data '"test"'
+curl -XPUT http://localhost:5984/_config/admins/test -H "Content-type: application/json" --data '"test"'
+curl -XPUT http://localhost:5985/_config/admins/test -H "Content-type: application/json" --data '"test"'
 curl -XPUT http://test:test@localhost:5984/_users/org.couchdb.user:test \
     -d '{"name":"test", "password":null, "roles":[], "type":"user"}' -H "Content-Type: application/json"
 curl -XPUT http://test:test@localhost:5985/_users/org.couchdb.user:test \
