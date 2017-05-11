@@ -34,8 +34,10 @@ class CouchDatabase private[couchdb](baseUrl: String,
       Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
-          val JArray(rows) = json \ "rows"
-          Future.successful(rows.map(row => extract[T](row \ "doc")))
+          json \ "rows" match {
+            case JArray(rows) => Future.successful(rows.map(row => extract[T](row \ "doc")))
+            case _ => Future.successful(List())
+          }
       }
     }
   }
@@ -56,10 +58,13 @@ class CouchDatabase private[couchdb](baseUrl: String,
       Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
-          val JArray(rows) = json \ "rows"
-          Future.successful(rows
-            .filter(row => (row \ "doc").isDefined)
-            .map(row => extract[T](row \ "doc")))
+          json \ "rows" match {
+            case JArray(rows) =>
+              Future.successful(rows
+                .filter(row => (row \ "doc").isDefined)
+                .map(row => extract[T](row \ "doc")))
+            case _ => Future.successful(List())
+          }
       }
     }
   }
