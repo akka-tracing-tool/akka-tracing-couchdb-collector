@@ -1,7 +1,7 @@
 package pl.edu.agh.iet.akka_tracing.couchdb
 
 import com.typesafe.config.Config
-import org.asynchttpclient.DefaultAsyncHttpClient
+import org.asynchttpclient.{ DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig }
 import org.json4s._
 import pl.edu.agh.iet.akka_tracing.config.ConfigUtils
 import pl.edu.agh.iet.akka_tracing.couchdb.model.ReplicationRequest
@@ -12,12 +12,19 @@ class CouchDbClient(host: String,
                     port: Int,
                     useHttps: Boolean,
                     user: Option[String],
-                    password: Option[String])
+                    password: Option[String],
+                    connectionTimeout: Int = 60000,
+                    requestTimeout: Int = 120000)
                    (implicit ec: ExecutionContext) {
 
   import CouchDbUtils._
 
-  private[couchdb] val asyncHttpClient = new DefaultAsyncHttpClient()
+  private[couchdb] val asyncHttpClient = new DefaultAsyncHttpClient(
+    new DefaultAsyncHttpClientConfig.Builder()
+      .setConnectTimeout(connectionTimeout)
+      .setRequestTimeout(requestTimeout)
+      .build()
+  )
   private implicit val formats = DefaultFormats
 
   private val protocol =
@@ -72,6 +79,8 @@ object CouchDbClient {
     )
     val user = config.getOption[String]("user")
     val password = config.getOption[String]("password")
-    new CouchDbClient(host, port, useHttps, user, password)
+    val connectionTimeout = config.getOption[Int]("connectionTimeout").getOrElse(60000)
+    val requestTimeout = config.getOption[Int]("requestTimeout").getOrElse(120000)
+    new CouchDbClient(host, port, useHttps, user, password, connectionTimeout, requestTimeout)
   }
 }
