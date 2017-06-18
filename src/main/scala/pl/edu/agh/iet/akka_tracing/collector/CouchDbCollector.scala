@@ -4,6 +4,7 @@ import java.util.concurrent.{ Executors, TimeUnit }
 
 import com.typesafe.config.Config
 import pl.edu.agh.iet.akka_tracing.couchdb.model._
+import pl.edu.agh.iet.akka_tracing.model.{ MessagesRelation, ReceiverMessage, SenderMessage }
 import pl.edu.agh.iet.akka_tracing.utils.DatabaseUtils
 
 import scala.collection.mutable
@@ -12,8 +13,6 @@ import scala.concurrent.ExecutionContext
 class CouchDbCollector(config: Config)
                       (implicit val ec: ExecutionContext)
   extends Collector {
-
-  import Collector._
 
   private[akka_tracing] val databaseUtils = new DatabaseUtils(config)
 
@@ -44,19 +43,19 @@ class CouchDbCollector(config: Config)
     }
   }, 500, 500, TimeUnit.MILLISECONDS)
 
-  override def handleSenderMessage(msg: CollectorSenderMessage): Unit = {
+  override def handleSenderMessage(msg: SenderMessage): Unit = {
     senderMessagesQueue.synchronized {
-      senderMessagesQueue += CouchDbSenderMessage(msg.id.toString, msg.sender, msg.message)
+      senderMessagesQueue += CouchDbSenderMessage(msg.id.toString, msg.sender, msg.contents)
     }
   }
 
-  override def handleReceiverMessage(msg: CollectorReceiverMessage): Unit = {
+  override def handleReceiverMessage(msg: ReceiverMessage): Unit = {
     receiverMessagesQueue.synchronized {
       receiverMessagesQueue += CouchDbReceiverMessage(msg.id.toString, msg.receiver)
     }
   }
 
-  override def handleRelationMessage(msg: RelationMessage): Unit = {
+  override def handleRelationMessage(msg: MessagesRelation): Unit = {
     val id1 = msg.id1.toString
     val id2 = msg.id2.toString
     messagesRelationsQueue.synchronized {
