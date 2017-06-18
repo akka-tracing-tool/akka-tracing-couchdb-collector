@@ -6,9 +6,8 @@ import com.typesafe.config.ConfigFactory
 import org.json4s._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{ FlatSpec, Matchers }
-import pl.edu.agh.iet.akka_tracing.collector.Collector._
 import pl.edu.agh.iet.akka_tracing.collector.CouchDbCollector
-import pl.edu.agh.iet.akka_tracing.model.{ Message, MessagesRelation }
+import pl.edu.agh.iet.akka_tracing.model.{ Message, MessagesRelation, ReceiverMessage, SenderMessage }
 import pl.edu.agh.iet.akka_tracing.utils.DatabaseUtils
 import pl.edu.agh.iet.akka_tracing.visualization.data.CouchDbDataSource
 
@@ -45,13 +44,13 @@ class IntegrationTest extends FlatSpec with Matchers with ScalaFutures {
     val couchDbCollector = new CouchDbCollector(masterConfig)
 
     couchDbCollector.handleSenderMessage(
-      CollectorSenderMessage(uuid1, "sender1", Some(JObject("test" -> JBool(true))))
+      SenderMessage(uuid1, "sender1", Some(JObject("test" -> JBool(true))))
     )
     couchDbCollector.handleSenderMessage(
-      CollectorSenderMessage(uuid2, "sender2", None)
+      SenderMessage(uuid2, "sender2", None)
     )
-    couchDbCollector.handleReceiverMessage(CollectorReceiverMessage(uuid1, "receiver1"))
-    couchDbCollector.handleRelationMessage(RelationMessage(uuid1, uuid2))
+    couchDbCollector.handleReceiverMessage(ReceiverMessage(uuid1, "receiver1"))
+    couchDbCollector.handleRelationMessage(MessagesRelation(uuid1, uuid2))
 
     // Wait for operations on DBs and replication
     Thread.sleep(5000)
