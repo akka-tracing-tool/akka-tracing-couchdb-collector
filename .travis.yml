@@ -9,6 +9,9 @@ before_script:
 script:
 - sbt clean test
 after_script:
+- echo "Testing..."
+- curl -XGET http://localhost:5984/
+- curl -XGET http://localhost:5985/
 - echo "Stoping and removing containers..."
 - docker stop couchdb
 - docker stop couchdb2

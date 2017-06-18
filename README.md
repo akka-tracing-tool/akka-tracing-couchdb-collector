@@ -15,6 +15,8 @@ This should be put as `collector` key in your `akka_tracing.conf`:
     password = test // Password (for authorization) (optional)
     useHttps = true // If the client should use HTTPS protocol (recommended)
     compactOnDelete = false // If after running cleanDatabase task client should compact dbs
+    connectionTimeout = 60000 // HTTP connection timeout in ms
+    requestTimeout = 120000 // HTTP request timeout in ms
     replication {} // You can put replication config here as well
   }
 }
