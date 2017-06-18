@@ -16,14 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
 /**
-  * This test requires 2 CouchDB instances:
-  *
-  * * one on localhost:5984
-  * * one on localhost:5985
-  *
-  * Both instances should have user test with password test.
-  *
-  * You can achieve this by running travis_before.sh script.
+  * This test requires docker environment created by running travis_before.sh script.
   */
 class IntegrationTest extends FlatSpec with Matchers with ScalaFutures {
   private val masterConfig = ConfigFactory.load("master.conf")
