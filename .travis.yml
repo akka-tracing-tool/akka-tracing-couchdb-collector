@@ -9,12 +9,12 @@ before_script:
 script:
 - sbt clean test
 after_script:
-- echo "Testing..."
-- curl -XGET http://localhost:5984/
-- curl -XGET http://localhost:5985/
+#- echo "Testing..."
+#- curl -XGET http://localhost:5984/
+#- curl -XGET http://localhost:5985/
 - echo "Stoping and removing containers..."
-- docker logs couchdb
-- docker logs couchdb2
+#- docker logs couchdb
+#- docker logs couchdb2
 - docker stop couchdb
 - docker stop couchdb2
 - docker rm couchdb
