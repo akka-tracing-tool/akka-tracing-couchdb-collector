@@ -1,37 +1,42 @@
 package pl.edu.agh.iet.akka_tracing.couchdb
 
-import java.nio.charset.Charset
+import java.nio.charset.{ Charset, StandardCharsets }
 
 import org.asynchttpclient.AsyncHttpClient
 import org.json4s.Extraction._
 import org.json4s._
+import org.json4s.ext.JavaTypesSerializers
 import org.json4s.native.JsonMethods._
 import pl.edu.agh.iet.akka_tracing.couchdb.model.Document
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success, Try }
 
-class CouchDatabase private[couchdb](baseUrl: String,
-                                     name: String,
-                                     client: AsyncHttpClient,
-                                     user: Option[String],
-                                     password: Option[String])
-                                    (implicit ec: ExecutionContext) {
+class CouchDatabase private[couchdb](
+    baseUrl: String,
+    name: String,
+    client: AsyncHttpClient,
+    user: Option[String],
+    password: Option[String]
+)(
+    implicit ec: ExecutionContext
+) {
 
   import CouchDbUtils._
 
-  private val databaseUrl = s"$baseUrl/$name"
-  private implicit val formats = DefaultFormats
+  private implicit val formats: Formats = DefaultFormats ++ JavaTypesSerializers.all
+  private val DatabaseUrl: String = s"$baseUrl/$name"
+  private val Utf8Charset: Charset = StandardCharsets.UTF_8
 
   def getAllDocs[T <: Document : Manifest]: Future[List[T]] = {
-    val url = s"$databaseUrl/_all_docs"
+    val url = s"$DatabaseUrl/_all_docs"
     val request = buildRequest(url, "GET", user, password,
       queryParams = Some(List(
         "include_docs" -> "true"
       ))
     )
     client.executeRequest(request).toCompletableFuture.asScala flatMap { response =>
-      Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
+      Try(parse(response.getResponseBody(Utf8Charset))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
           json \ "rows" match {
@@ -43,7 +48,7 @@ class CouchDatabase private[couchdb](baseUrl: String,
   }
 
   def getDocs[T <: Document : Manifest](ids: List[String]): Future[List[T]] = {
-    val url = s"$databaseUrl/_all_docs"
+    val url = s"$DatabaseUrl/_all_docs"
     val request = buildRequest(url, "POST", user, password,
       queryParams = Some(List(
         "include_docs" -> "true"
@@ -55,7 +60,7 @@ class CouchDatabase private[couchdb](baseUrl: String,
       ))
     )
     client.executeRequest(request).toCompletableFuture.asScala flatMap { response =>
-      Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
+      Try(parse(response.getResponseBody(Utf8Charset))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
           json \ "rows" match {
@@ -69,8 +74,16 @@ class CouchDatabase private[couchdb](baseUrl: String,
     }
   }
 
+  def putDoc[T <: Document](doc: T): Future[Unit] = {
+    val url = s"$DatabaseUrl/${ doc._id }"
+    val request = buildRequest(url, "PUT", user, password,
+      body = Some(decompose(doc))
+    )
+    client.executeRequest(request).toCompletableFuture.asScala.map(_ => ())
+  }
+
   def putDocs[T <: Document](docs: List[T]): Future[Unit] = {
-    val url = s"$databaseUrl/_bulk_docs"
+    val url = s"$DatabaseUrl/_bulk_docs"
     val request = buildRequest(url, "POST", user, password,
       body = Some(JObject(
         "docs" -> JArray(
@@ -82,21 +95,21 @@ class CouchDatabase private[couchdb](baseUrl: String,
   }
 
   def attemptToCreate: Future[Unit] = {
-    val request = buildRequest(databaseUrl, "PUT", user, password)
+    val request = buildRequest(DatabaseUrl, "PUT", user, password)
     client.executeRequest(request).toCompletableFuture.asScala.map(_ => ())
       .recover({ case _ => () })
   }
 
   def deleteAllDocs(): Future[Unit] = {
-    val getUrl = s"$databaseUrl/_all_docs"
+    val getUrl = s"$DatabaseUrl/_all_docs"
     val getRequest = buildRequest(getUrl, "GET", user, password)
     client.executeRequest(getRequest).toCompletableFuture.asScala flatMap { response =>
-      Try(parse(response.getResponseBody(Charset.forName("utf-8")))) match {
+      Try(parse(response.getResponseBody(Utf8Charset))) match {
         case Failure(ex) => Future.failed(ex)
         case Success(json) =>
           json \ "rows" match {
             case JArray(docs) =>
-              val deleteUrl = s"$databaseUrl/_bulk_docs"
+              val deleteUrl = s"$DatabaseUrl/_bulk_docs"
               val deleteRequest = buildRequest(deleteUrl, "POST", user, password,
                 body = Some(JObject(
                   "docs" -> JArray(
@@ -118,7 +131,7 @@ class CouchDatabase private[couchdb](baseUrl: String,
   }
 
   def compactDb(): Future[Unit] = {
-    val request = buildRequest(s"$databaseUrl/_compact", "POST", user, password)
+    val request = buildRequest(s"$DatabaseUrl/_compact", "POST", user, password)
     client.executeRequest(request).toCompletableFuture.asScala map { _ => () }
   }
 }

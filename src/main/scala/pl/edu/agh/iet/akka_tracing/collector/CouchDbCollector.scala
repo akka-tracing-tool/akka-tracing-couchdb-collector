@@ -1,71 +1,65 @@
 package pl.edu.agh.iet.akka_tracing.collector
 
-import java.util.concurrent.{ Executors, TimeUnit }
+import java.util.UUID
 
+import akka.actor.Props
 import com.typesafe.config.Config
 import pl.edu.agh.iet.akka_tracing.couchdb.model._
 import pl.edu.agh.iet.akka_tracing.model.{ MessagesRelation, ReceiverMessage, SenderMessage }
 import pl.edu.agh.iet.akka_tracing.utils.DatabaseUtils
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
 
-class CouchDbCollector(config: Config)
-                      (implicit val ec: ExecutionContext)
-  extends Collector {
+class CouchDbCollector(config: Config) extends Collector {
 
   private[akka_tracing] val databaseUtils = new DatabaseUtils(config)
 
+  import CouchDbCollector.SendToDatabase
+  import pl.edu.agh.iet.akka_tracing.config.ConfigUtils._
   import databaseUtils._
 
-  private val senderMessagesQueue = mutable.MutableList[CouchDbSenderMessage]()
-  private val receiverMessagesQueue = mutable.MutableList[CouchDbReceiverMessage]()
-  private val messagesRelationsQueue = mutable.MutableList[CouchDbMessagesRelation]()
+  import scala.concurrent.duration._
 
-  private val threadPool = Executors.newScheduledThreadPool(1)
-  threadPool.scheduleAtFixedRate(new Runnable {
-    def run(): Unit = {
-      senderMessagesQueue.synchronized {
-        val senderMessages = senderMessagesQueue.toList
-        senderMessagesQueue.clear()
-        senderMessagesDatabase.putDocs(senderMessages)
-      }
-      receiverMessagesQueue.synchronized {
-        val receiverMessages = receiverMessagesQueue.toList
-        receiverMessagesQueue.clear()
-        receiverMessagesDatabase.putDocs(receiverMessages)
-      }
-      messagesRelationsQueue.synchronized {
-        val messagesRelations = messagesRelationsQueue.toList
-        messagesRelationsQueue.clear()
-        messagesRelationsDatabase.putDocs(messagesRelations)
-      }
-    }
-  }, 500, 500, TimeUnit.MILLISECONDS)
+  private val senderMessagesQueue = mutable.MutableList[SenderMessage]()
+  private val receiverMessagesQueue = mutable.MutableList[ReceiverMessage]()
+  private val messagesRelationsQueue = mutable.MutableList[MessagesRelation]()
+  private val sendToDatabaseInterval = config.getOrElse[Int]("sendToDatabaseInterval.millis", 1000).millis
+
+  context.system.scheduler.schedule(sendToDatabaseInterval, sendToDatabaseInterval, self, SendToDatabase)
 
   override def handleSenderMessage(msg: SenderMessage): Unit = {
-    senderMessagesQueue.synchronized {
-      senderMessagesQueue += CouchDbSenderMessage(msg.id.toString, msg.sender, msg.contents)
-    }
+    senderMessagesQueue += msg
   }
 
   override def handleReceiverMessage(msg: ReceiverMessage): Unit = {
-    receiverMessagesQueue.synchronized {
-      receiverMessagesQueue += CouchDbReceiverMessage(msg.id.toString, msg.receiver)
-    }
+    receiverMessagesQueue += msg
   }
 
   override def handleRelationMessage(msg: MessagesRelation): Unit = {
-    val id1 = msg.id1.toString
-    val id2 = msg.id2.toString
-    messagesRelationsQueue.synchronized {
-      messagesRelationsQueue += CouchDbMessagesRelation(s"${id1}_$id2", id1, id2)
-    }
+    messagesRelationsQueue += msg
+  }
+
+  override def handleOtherMessages: PartialFunction[Any, Unit] = {
+    case SendToDatabase =>
+      val senderMessages = senderMessagesQueue.toList
+      senderMessagesQueue.clear()
+      val receiverMessages = receiverMessagesQueue.toList
+      receiverMessagesQueue.clear()
+      val messagesRelations = messagesRelationsQueue.toList
+      messagesRelationsQueue.clear()
+      updatesDatabase.putDocs(List(Update(
+        UUID.randomUUID.toString, receiverMessages, senderMessages, messagesRelations
+      )))
   }
 }
 
+object CouchDbCollector {
+
+  case object SendToDatabase
+
+}
+
 class CouchDbCollectorConstructor extends CollectorConstructor {
-  override def fromConfig(config: Config)(implicit ec: ExecutionContext): Collector = {
-    new CouchDbCollector(config)
-  }
+  override def propsFromConfig(config: Config) =
+    Props(classOf[CouchDbCollector], config)
 }
