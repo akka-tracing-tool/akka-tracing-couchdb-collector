@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 echo "Creating Couches on Docker"
 docker run -d --name couchdb2 -p 5985:5984 klaemo/couchdb:1.6.1
-docker run -d --name couchdb --link=couchdb2:slave -p 5984:5984 klaemo/couchdb:1.6.1
+docker run -d --name couchdb --link=couchdb2:replica -p 5984:5984 klaemo/couchdb:1.6.1
 echo "Waiting for Couches to initialize..."
 for ((i=1;i<=10;i++)); do
     sleep 1

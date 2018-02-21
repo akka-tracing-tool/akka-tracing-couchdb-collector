@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture
 
 import org.asynchttpclient.{ Request, RequestBuilder, Response }
 import org.json4s._
+import org.json4s.ext.JavaTypesSerializers
 import org.json4s.native.JsonMethods._
 import org.slf4j.LoggerFactory
 
@@ -16,7 +17,7 @@ private[couchdb] object CouchDbUtils {
   private val base64Encoder = Base64.getEncoder
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private implicit val formats = DefaultFormats
+  private implicit val formats: Formats = DefaultFormats ++ JavaTypesSerializers.all
 
   def getBase64AuthValue(user: String, password: String): String = {
     base64Encoder.encodeToString(
@@ -24,12 +25,14 @@ private[couchdb] object CouchDbUtils {
     )
   }
 
-  def buildRequest(url: String,
-                   method: String,
-                   userOption: Option[String],
-                   passwordOption: Option[String],
-                   queryParams: Option[List[(String, String)]] = None,
-                   body: Option[JValue] = None): Request = {
+  def buildRequest(
+      url: String,
+      method: String,
+      userOption: Option[String],
+      passwordOption: Option[String],
+      queryParams: Option[List[(String, String)]] = None,
+      body: Option[JValue] = None
+  ): Request = {
     val rb = new RequestBuilder(method)
       .setUrl(url)
       .addHeader("Accept", "application/json")
@@ -56,7 +59,9 @@ private[couchdb] object CouchDbUtils {
       future.toScala flatMap { response =>
         val statusCode = response.getStatusCode
         if (statusCode < 200 || statusCode >= 300) {
-          Future.failed(RequestFailedException(statusCode, response.getResponseBody(StandardCharsets.UTF_8)))
+          Future.failed(RequestFailedException(
+            statusCode, response.getResponseBody(StandardCharsets.UTF_8)
+          ))
         }
         Future.successful(response)
       } recoverWith {

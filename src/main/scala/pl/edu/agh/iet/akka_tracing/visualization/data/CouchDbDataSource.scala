@@ -1,10 +1,8 @@
 package pl.edu.agh.iet.akka_tracing.visualization.data
 
-import java.util.UUID
-
 import com.typesafe.config.Config
-import pl.edu.agh.iet.akka_tracing.couchdb.model._
-import pl.edu.agh.iet.akka_tracing.model.{ Message, MessagesRelation }
+import pl.edu.agh.iet.akka_tracing.couchdb.model.Update
+import pl.edu.agh.iet.akka_tracing.model._
 import pl.edu.agh.iet.akka_tracing.utils.DatabaseUtils
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -18,27 +16,32 @@ class CouchDbDataSource(config: Config)(implicit val ec: ExecutionContext) exten
   override def onStart: Future[Unit] = databaseUtils.init
 
   override def getMessages: Future[List[Message]] = {
-    senderMessagesDatabase.getAllDocs[CouchDbSenderMessage] flatMap { senderMessages =>
-      val ids = senderMessages map { msg => msg._id }
-      receiverMessagesDatabase.getDocs[CouchDbReceiverMessage](ids) map { receiverMessages =>
-        senderMessages map { senderMessage =>
-          val receiverMessage = receiverMessages
-            .find(_._id == senderMessage._id)
-          Message(
-            UUID.fromString(senderMessage._id),
-            senderMessage.sender,
-            receiverMessage.map(_.receiver),
-            senderMessage.contents
-          )
-        }
+    getUpdates map { updates =>
+      val senderMessages = updates.foldLeft(List.empty[SenderMessage]) {
+        case (acc, update) => acc ++ update.senderMessages
+      }
+      val receiverMessages = updates.foldLeft(List.empty[ReceiverMessage]) {
+        case (acc, update) => acc ++ update.receiverMessages
+      }
+      senderMessages map { senderMessage =>
+        val receiverMessage = receiverMessages.find(_.id == senderMessage.id)
+        Message(
+          senderMessage.id,
+          senderMessage.sender,
+          receiverMessage.map(_.receiver),
+          senderMessage.contents
+        )
       }
     }
   }
 
-  override def getRelations: Future[List[MessagesRelation]] =
-    messagesRelationsDatabase.getAllDocs[CouchDbMessagesRelation] map { relations =>
-      relations.map { relation => relation.toMessagesRelation }
+  override def getRelations: Future[List[MessagesRelation]] = getUpdates map { updates =>
+    updates.foldLeft(List.empty[MessagesRelation]) {
+      case (acc, update) => acc ++ update.relationMessages
     }
+  }
+
+  private[akka_tracing] def getUpdates: Future[List[Update]] = updatesDatabase.getAllDocs[Update]
 }
 
 class CouchDbDataSourceConstructor extends DataSourceConstructor {

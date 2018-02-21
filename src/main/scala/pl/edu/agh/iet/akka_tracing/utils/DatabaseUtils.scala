@@ -13,44 +13,30 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
   import ConfigUtils._
 
   private val dbConfig = config.getOrElse[Config]("database", ConfigFactory.empty("database"))
+  private val httpConfig = config.getOrElse[Config]("http", ConfigFactory.empty("http"))
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private[akka_tracing] val couchDbClient = CouchDbClient(dbConfig)
+  private[akka_tracing] val couchDbClient = CouchDbClient(dbConfig, httpConfig)
 
-  private val ReceiverMessagesDbName = "receiver_messages"
-  private val SenderMessagesDbName = "sender_messages"
-  private val MessagesRelationsDbName = "messages_relations"
-
-  private[akka_tracing] val receiverMessagesDatabase = couchDbClient.getDb(ReceiverMessagesDbName)
-  private[akka_tracing] val senderMessagesDatabase = couchDbClient.getDb(SenderMessagesDbName)
-  private[akka_tracing] val messagesRelationsDatabase = couchDbClient.getDb(MessagesRelationsDbName)
+  private val UpdatesDbName = "updates"
+  private[akka_tracing] val updatesDatabase = couchDbClient.getDb(UpdatesDbName)
 
   def init: Future[Unit] = {
     logger.info("Creating databases (if necessary)...")
-    Future.sequence(Seq(
-      senderMessagesDatabase.attemptToCreate,
-      receiverMessagesDatabase.attemptToCreate,
-      messagesRelationsDatabase.attemptToCreate
-    )) flatMap {
-      _ => replicateFromConfig()
-    } map {
-      _ => logger.info("Done")
-    }
+    updatesDatabase.attemptToCreate flatMap { _ =>
+      logger.info("Done")
+      logger.info("Setting up replication...")
+      replicateFromConfig()
+    } map { _ => logger.info("Done") }
   }
 
   def clean: Future[Unit] = {
     logger.info("Cleaning databases...")
-    Future.sequence(Seq(
-      senderMessagesDatabase.deleteAllDocs(),
-      receiverMessagesDatabase.deleteAllDocs(),
-      messagesRelationsDatabase.deleteAllDocs()
-    )) flatMap { _ =>
+    updatesDatabase.deleteAllDocs() flatMap { _ =>
       if (dbConfig.getOrElse[Boolean]("compactOnDelete", false)) {
-        Future.sequence(Seq(
-          senderMessagesDatabase.compactDb(),
-          receiverMessagesDatabase.compactDb(),
-          messagesRelationsDatabase.compactDb()
-        )) map { _ => () }
+        logger.info("Done")
+        logger.info("Compacting databases...")
+        updatesDatabase.compactDb()
       } else {
         Future.successful(())
       }
@@ -61,9 +47,7 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
     val replicationConfigOption = dbConfig.getOption[Config]("replication")
     replicationConfigOption map { replicationConfig =>
       val dbNames = Seq(
-        ReceiverMessagesDbName,
-        SenderMessagesDbName,
-        MessagesRelationsDbName
+        UpdatesDbName
       )
       val targetsConfig = replicationConfig.getOrElse[Seq[Config]]("targets", Seq())
       val targets = targetsConfig.flatMap(targetConfig => {
@@ -81,8 +65,7 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
         dbNames.map(dbName => (continuous, createDb,
           RemoteReplicationDbConfig(host, port, dbName, useHttps, user, password)))
       })
-      val replications = targets map {
-        case (continuous, createDb, target) =>
+      val replications = targets map { case (continuous, createDb, target) =>
         val protocol =
           if (target.useHttps) {
             "https"
@@ -90,8 +73,8 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
             "http"
           }
         logger.info(
-          s"Performing replication from ${target.database} to " +
-            s"$protocol://${target.host}:${target.port}/${target.database}"
+          s"Performing replication from ${ target.database } to " +
+            s"$protocol://${ target.host }:${ target.port }/${ target.database }"
         )
         ReplicationRequest(
           LocalReplicationDbConfig(target.database),
@@ -101,6 +84,6 @@ class DatabaseUtils(config: Config)(implicit ec: ExecutionContext) {
         )
       }
       Future.sequence(replications.map(replication => couchDbClient.replicate(replication)))
-    } getOrElse Future.sequence(Seq[Future[Unit]]())
+    } getOrElse Future.successful(Seq.empty[Unit])
   }
 }
