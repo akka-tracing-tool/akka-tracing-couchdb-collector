@@ -74,14 +74,6 @@ class CouchDatabase private[couchdb](
     }
   }
 
-  def putDoc[T <: Document](doc: T): Future[Unit] = {
-    val url = s"$DatabaseUrl/${ doc._id }"
-    val request = buildRequest(url, "PUT", user, password,
-      body = Some(decompose(doc))
-    )
-    client.executeRequest(request).toCompletableFuture.asScala.map(_ => ())
-  }
-
   def putDocs[T <: Document](docs: List[T]): Future[Unit] = {
     val url = s"$DatabaseUrl/_bulk_docs"
     val request = buildRequest(url, "POST", user, password,
